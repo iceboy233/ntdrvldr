@@ -37,10 +37,6 @@ LoadDriver(
 
     Status = NtLoadDriver(&DriverServiceName);
     StringFreeUnicode(&DriverServiceName);
-    {
-        int __cdecl printf();
-        printf("%x\n", Status);
-    }
     if (!NT_SUCCESS(Status))
         return RtlNtStatusToDosError(Status);
 
