@@ -1,0 +1,12 @@
+TARGETNAME=ntdrvldr
+TARGETTYPE=PROGRAM
+
+UMTYPE=console
+UMENTRY=wmain
+
+USE_MSVCRT=1
+
+TARGETLIBS=$(SDK_LIB_PATH)\ntdll.lib \
+           $(SDK_LIB_PATH)\shlwapi.lib
+
+SOURCES=strutil.c regkey.c loaddrv.c main.c
