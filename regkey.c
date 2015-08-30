@@ -15,10 +15,12 @@ CreateRegistryKey(
     LPWSTR RegistryPath;
     ULONG dwErrorCode;
     HKEY hKey;
+    DWORD dwDisposition;
     DWORD dwServiceType = 1;
     DWORD dwServiceErrorControl = 1;
     DWORD dwServiceStart = 3;
     LPWSTR ServiceImagePath;
+    SIZE_T ServiceImagePathSize;
 
     dwErrorCode = StringConcat(&RegistryPath,
                                REGISTRY_PATH_PREFIX, DriverName);
@@ -40,19 +42,24 @@ CreateRegistryKey(
                                   KEY_ALL_ACCESS,
                                   NULL,
                                   &hKey,
-                                  NULL);
+                                  &dwDisposition);
     StringFree(RegistryPath);
     if (dwErrorCode) {
         StringFree(ServiceImagePath);
         return dwErrorCode;
     }
+    if (dwDisposition != REG_CREATED_NEW_KEY) {
+        RegCloseKey(hKey);
+        return ERROR_ALREADY_EXISTS;
+    }
 
+    ServiceImagePathSize = (lstrlenW(ServiceImagePath) + 1) * sizeof(WCHAR);
     dwErrorCode = RegSetValueExW(hKey,
                                  L"ImagePath",
                                  0,
                                  REG_EXPAND_SZ,
                                  (const BYTE *)ServiceImagePath,
-                                 (lstrlenW(ServiceImagePath) + 1) * sizeof(WCHAR));
+                                 ServiceImagePathSize);
     StringFree(ServiceImagePath);
     if (dwErrorCode) {
         RegCloseKey(hKey);
