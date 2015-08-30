@@ -10,6 +10,27 @@ BOOL bUnload = FALSE;
 wchar_t *DriverName = NULL;
 wchar_t *DriverPath = NULL;
 
+VOID
+PrintErrorAndExit(
+    wchar_t *Function,
+    ULONG dwErrorCode
+    )
+{
+    LPWSTR Buffer;
+
+    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                   FORMAT_MESSAGE_FROM_SYSTEM |
+                   FORMAT_MESSAGE_IGNORE_INSERTS,
+                   NULL,
+                   dwErrorCode,
+                   LANG_USER_DEFAULT,
+                   (LPWSTR)&Buffer,
+                   0,
+                   NULL);
+    fwprintf(stderr, L"%s: %ws", Function, Buffer);
+    exit(dwErrorCode);
+}
+
 ULONG
 EnablePrivilege(
     LPCWSTR lpPrivilegeName
@@ -57,7 +78,10 @@ ParseCommandLine(
     )
 {
     int Index;
-    wchar_t *LastPart;
+    DWORD dwAllocLength;
+    DWORD dwLength;
+    LPWSTR Buffer;
+    LPWSTR FilePart;
 
     for (Index = 1; Index < argc; ++Index) {
         if (argv[Index][0] != '-') {
@@ -83,39 +107,24 @@ ParseCommandLine(
         }
     }
 
-    if (!DriverPath)
+    if (DriverPath == NULL)
         PrintUsageAndExit();
 
+    // Translate to full path name
+    dwAllocLength = GetFullPathNameW(DriverPath, 0, NULL, NULL);
+    if (dwAllocLength == 0)
+        PrintErrorAndExit(L"GetFullPathNameW", GetLastError());
+    Buffer = HeapAlloc(GetProcessHeap(), 0, (dwAllocLength * sizeof(WCHAR)));
+    if (Buffer == NULL)
+        PrintErrorAndExit(L"HeapAlloc", GetLastError());
+    dwLength = GetFullPathNameW(DriverPath, dwAllocLength, Buffer, &FilePart);
+    if (dwLength == 0)
+        PrintErrorAndExit(L"GetFullPathNameW", GetLastError());
+    DriverPath = Buffer;
+
     // Use filename as driver name if not specified
-    if (!DriverName) {
-        LastPart = wcsrchr(DriverPath, L'\\');
-        if (LastPart) {
-            DriverName = LastPart + 1;
-        } else {
-            DriverName = DriverPath;
-        }
-    }
-}
-
-VOID
-PrintErrorAndExit(
-    wchar_t *Function,
-    ULONG dwErrorCode
-    )
-{
-    LPWSTR Buffer;
-
-    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                   FORMAT_MESSAGE_FROM_SYSTEM |
-                   FORMAT_MESSAGE_IGNORE_INSERTS,
-                   NULL,
-                   dwErrorCode,
-                   LANG_USER_DEFAULT,
-                   &Buffer,
-                   0,
-                   NULL);
-    fwprintf(stderr, L"%s: %ws", Function, Buffer);
-    exit(dwErrorCode);
+    if (DriverName == NULL)
+        DriverName = FilePart;
 }
 
 int
@@ -146,7 +155,7 @@ wmain(
         dwErrorCode = UnloadDriver(DriverName);
         if (dwErrorCode)
             PrintErrorAndExit(L"UnloadDriver", dwErrorCode);
-        dwErrorCode = DeleteRegistryKey(DriverName, DriverPath);
+        dwErrorCode = DeleteRegistryKey(DriverName);
         if (dwErrorCode)
             PrintErrorAndExit(L"DeleteRegistryKey", dwErrorCode);
     }
